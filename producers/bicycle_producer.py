@@ -1,11 +1,9 @@
-
 import time
 import json
 import logging
 from confluent_kafka import Producer
 from apis.seoul_data.realtime_bicycle import RealtimeBicycle
 from datetime import datetime
-
 
 BROKER_LST = 'kafka01:9092,kafka02:9092,kafka03:9092'
 
@@ -14,7 +12,8 @@ class BicycleProducer():
 
     def __init__(self, topic):
         self.topic = topic
-        self.conf = {'bootstrap.servers': BROKER_LST}
+        self.conf = {'bootstrap.servers': BROKER_LST,
+                     'compression.type': 'lz4'}
         self.producer = Producer(self.conf)
         self._set_logger()
 
@@ -50,7 +49,6 @@ class BicycleProducer():
                 item['STT_LTTD'] = item.pop('stationLatitude')
                 item['STT_LGTD'] = item.pop('stationLongitude')
 
-
                 # 컬럼 추가
                 item['CRT_DTTM'] = now_dt
 
@@ -58,14 +56,14 @@ class BicycleProducer():
                 try:
                     self.producer.produce(
                         topic=self.topic,
-                        key=json.dumps({'STT_ID': item['STT_ID'],'CRT_DTTM':item['CRT_DTTM']}, ensure_ascii=False),
+                        key=json.dumps({'STT_ID': item['STT_ID'], 'CRT_DTTM': item['CRT_DTTM']}, ensure_ascii=False),
                         value=json.dumps(item, ensure_ascii=False),
                         on_delivery=self.delivery_callback
                     )
 
                 except BufferError:
                     self.log.error('%% Local producer queue is full (%d messages awaiting delivery): try again\n' %
-                                     len(self.producer))
+                                   len(self.producer))
 
             # Serve delivery callback queue.
             # NOTE: Since produce() is an asynchronous API this poll() call
